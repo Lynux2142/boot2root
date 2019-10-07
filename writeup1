@@ -1,4 +1,5 @@
-- trouver l'adresse ip de la VM:
+-
+trouver l'adresse ip de la VM:
 	etdiscover -i eth0 -r 10.0.2.0/24
 
 - scanner les ports de la VM:
@@ -38,6 +39,11 @@
 - recuperer les identifiants de connexion present dans le dossier home/LOOKATME/password grace au script php:
 	https://10.0.2.4/forum/templates_c/shell.php?e=cat%20/home/LOOKATME/password
 
+- sur le home de laurie est present un fichier tar contenant beaucoup de fichier qui sont en realiter des morceau de code en c
+	dans chacun des ces fichier est present un commantaire avec un numero de fichier ce qui nous indique un ordre
+	nous creont donc un script qui va lire ces fichier dans le bon ordre et en registrer la concatenation de tout les fichiers dans un seul autre pour le rendre compilable
+	l'execution de celui-ci nous renvoie le mot de passe qu'il faut ensuite convertir en md5
+
 - utiliser le script ftp_fun.sh pour recuperer le mot de passe de l'utilisateur laurie:
 	bash ftp_fun.sh {IP}
 	330b845f32185747e4f8ca15d40ca59796035c89ea809fb5d30f4da83ecf45a4
@@ -66,7 +72,7 @@
 	- phase_4:
 		aucun indice
 		le mot de passe contient un seul nombres
-		un fonction est presente et calcule la valeur de fibonacci a l'index correspondant a ce nombre
+		une fonction est presente et calcule la valeur de fibonacci a l'index correspondant au nombre donne donner en paramettre
 		et cette valeur doit etre 55
 		le mot de passe est donc 9
 	- phase_5:
@@ -87,7 +93,7 @@
 - compiler et executer le script all_phase_5_possibilities et enregistrer le resultat dans un fichier
 	ce qui genere tout les mots de passe capable de deverrouiller la phase_5
 
-- executer le script create_all_password.py  en passant en paramettre le fichier precedant et enregistrer le resultat dans un fichier
+- executer le script create_all_password.py  en passant en paramettre le fichier precedant et enregistrer le resultat dans un autre fichier
 	ce qui genere tout les mots de passes possibles pour thor
 	on utilise ensuite hidra pour tous les tester (hydra -l thor -P {passords_file} ssh://{IP} -t 4)
 
