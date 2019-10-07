@@ -84,9 +84,12 @@
 		et les maillons doivent etre trier par ordre croissant en fonction de la valeur des int
 		le mot de passe est la liste des index des maillons de depart dans l'orde qu'il sont au final
 
-- compiler et executer le script create_all_password.c et enregistrer le resultat dans un fichier
+- compiler et executer le script all_phase_5_possibilities et enregistrer le resultat dans un fichier
+	ce qui genere tout les mots de passe capable de deverrouiller la phase_5
+
+- executer le script create_all_password.py  en passant en paramettre le fichier precedant et enregistrer le resultat dans un fichier
 	ce qui genere tout les mots de passes possibles pour thor
-	on utilise ensuite hidra pour tous les tester (hydra -l thor -P {passords_file} ssh://{IP})
+	on utilise ensuite hidra pour tous les tester (hydra -l thor -P {passords_file} ssh://{IP} -t 4)
 
 - se connecter a thor avec le mot de passe resultant de hidra
 	nous decouvront que le fichier turtle est un programme code dans le language turtle
