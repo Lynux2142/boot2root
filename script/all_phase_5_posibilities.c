@@ -72,7 +72,7 @@ int	main(void)
 {
 	char str[7];
 	int ok = 1;
-	const int begin = 2;
+	const int begin = 6;
 
 	for (int a = begin ; a < 8 ; ++a)
 		for (int b = begin ; b < 8 ; ++b)
