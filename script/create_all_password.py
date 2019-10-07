@@ -8,7 +8,7 @@ def main():
     phase_3 = [ "1b214", "2b755", "7b524" ]
     phase_4 = "9"
     phase_5 = []
-    phase_6 = "426135"
+    phase_6 = "426135" # mot de passe de base '4 2 6 3 1 5' on a swaper le 3 et le 1 (erreur dans le sujet)
 
     try:
         phase_5_file = open(sys.argv[1], 'r')
